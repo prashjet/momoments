@@ -5,8 +5,7 @@ from scipy import stats
 def sample_l_moments(x):
     """_summary_
 
-    Vectorised version of `_samlmusmall` from the `lmoments3` library. This 
-    also required dropping the `exact` keyword from the `comb` function.
+    Vectorised version of `_samlmusmall` from the `lmoments3` library. 
     
     """
     n = len(x)
@@ -36,10 +35,6 @@ def sample_l_moments(x):
 
 def sample_rl_moments(x):
     l3, l4 = sample_l_moments(x)
-    # delta_1_2_2 = get_delta_i_j_k_Phi(1, 2, 2)
-    # delta_1_2_3 = get_delta_i_j_k_Phi(1, 2, 3)
-    # delta_2_3_4 = get_delta_i_j_k_Phi(2, 3, 4)
-    # delta_3_4_4 = get_delta_i_j_k_Phi(3, 4, 4)
     # THESE VALUES TAKEN FROM HARTER 1961, TABULATED VALUES UP TO 5 DP.
     # https://www.jstor.org/stable/2333139?seq=1
     delta_1_2_2 = 2. * 0.56419
@@ -68,7 +63,7 @@ def integral_rl_moments(f, x_edg):
     -------
     array
         shape (2, ...), where 0'th entry is RL skewness, 1'st is RL kurtosis
-    """    
+    """
     dx = x_edg[1] - x_edg[0]
     x_c = (x_edg[:-1] + x_edg[1:])/2.
     F = np.cumsum(f*dx, -1)
@@ -99,10 +94,6 @@ def get_lmoment_integral_DF(f, x_edg):
 def get_rlmoment_from_lmoment(f, x_edg):
     nrm = stats.norm()
     tau3, tau4 = get_lmoment_integral_DF(f, x_edg)
-    # delta_1_2_2 = get_delta_i_j_k_Phi(1, 2, 2)
-    # delta_1_2_3 = get_delta_i_j_k_Phi(1, 2, 3)
-    # delta_2_3_4 = get_delta_i_j_k_Phi(2, 3, 4)
-    # delta_3_4_4 = get_delta_i_j_k_Phi(3, 4, 4)
     # THESE VALUES TAKEN FROM HARTER 1961, TABULATED VALUES UP TO 5 DP.
     # https://www.jstor.org/stable/2333139?seq=1
     delta_1_2_2 = 2. * 0.56419
@@ -115,6 +106,3 @@ def get_rlmoment_from_lmoment(f, x_edg):
         - 3. * (1./delta_2_3_4 - 1./delta_3_4_4)
     )
     return np.vstack((tau3, tau4))
-
-
-

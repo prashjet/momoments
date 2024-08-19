@@ -143,6 +143,30 @@ class UniformKernel(BaseKernel):
         Fk = 0.5*(np.exp(iau_min)-1.)/iau_min 
         Fk += 0.5*(np.exp(iau_pls)-1.)/iau_pls
         return Fk
+
+class TriangleKernel(BaseKernel):
+    
+    def __init__(self):
+        super().__init__(alpha=1/3., beta=1/6., gamma=1/18.)
+
+    def constuct_kernel(self, a_minus, a_plus):
+        kernel = MixtureModel(
+            [stats.triang(loc=-a_minus, scale=a_minus, c=1),
+             stats.triang(loc=0., scale=a_plus, c=0.)],
+            weights=[0.5, 0.5]
+            )
+        return kernel
+    
+    def evaluate_fft(self,
+                     a_minus: float,
+                     a_plus: float,
+                     u: np.array) -> np.array:
+        iu = 1j*u
+        iau_min = -a_minus*iu
+        iau_pls = a_plus*iu
+        Fk = (1 + iau_min - np.exp(iau_min))/(a_minus*u)**2.
+        Fk += (1 + iau_pls - np.exp(iau_pls))/(a_plus*u)**2.
+        return Fk
     
 class CosineKernel(BaseKernel):
     
@@ -162,22 +186,6 @@ class CosineKernel(BaseKernel):
             weights=[0.5, 0.5]
             )
         return kernel
-
-    def evaluate(self, 
-                 a_minus: float, 
-                 a_plus: float, 
-                 w: np.array) -> np.array:
-        w = np.atleast_1d(w)
-        pi_on_2am = 0.5*np.pi/a_minus
-        pi_on_2ap = 0.5*np.pi/a_plus
-        k = np.where(
-            w<=0., 
-            0.5*pi_on_2am*np.cos(pi_on_2am*w), 
-            0.5*pi_on_2ap*np.cos(pi_on_2ap*w)
-        )
-        k[w<-a_minus] = 0.
-        k[w>a_plus] = 0.
-        return k
     
     def evaluate_fft(self,
                      a_minus: float,
@@ -231,15 +239,6 @@ class GaussianKernel(BaseKernel):
             weights=[0.5, 0.5]
             )
         return kernel
-    
-    def evaluate(self, 
-                 a_minus: float, 
-                 a_plus: float, 
-                 w: np.array) -> np.array:
-        k = np.where(w<=0.,
-                     1./a_minus/(2*np.pi)**0.5 * np.exp(-0.5*w**2/a_minus**2),
-                     1./a_plus/(2*np.pi)**0.5 * np.exp(-0.5*w**2/a_plus**2))
-        return k
     
     def evaluate_fft(self,
                      a_minus: float,
@@ -300,6 +299,8 @@ class Kernel(object):
             self.pkernel = UniformKernel()
         elif self.pkernel_type=='cosine':
             self.pkernel = CosineKernel()
+        elif self.pkernel_type=='triangle':
+            self.pkernel = TriangleKernel()            
         else:
             raise ValueError('Unknown platykurtic_kernel')
         if self.lkernel_type=='laplace':
@@ -318,6 +319,8 @@ class Kernel(object):
                 self.pkernel.delta_max_two_sided(),
                 self.lkernel.delta_max_two_sided()
             ])
+        elif self.which_delta_limit == None:
+            self.delta_max = np.inf
         else:
             raise ValueError('which_delta_limit should be `real` or two_sided`')
 
@@ -332,7 +335,12 @@ class Kernel(object):
         u = np.atleast_1d(u)
         Fkp = self.pkernel.evaluate_fft(*self.pkscales, u)
         Fkl = self.lkernel.evaluate_fft(*self.lkscales, u)
-        Fk = (1.-self.kappa_weight)*Fkp + self.kappa_weight*Fkl
+        if self.kappa_weight==0.:
+            Fk = Fkp
+        elif self.kappa_weight==1.:
+            Fk = Fkl
+        else:
+            Fk = (1.-self.kappa_weight)*Fkp + self.kappa_weight*Fkl
         Fk[u==0.]=1.
         return Fk
 
